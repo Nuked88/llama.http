@@ -216,7 +216,7 @@ $(info I CC:       $(CCV))
 $(info I CXX:      $(CXXV))
 $(info )
 
-default: main quantize perplexity embedding
+default: main server quantize perplexity embedding
 
 #
 # Build library
@@ -231,13 +231,22 @@ llama.o: llama.cpp llama.h
 common.o: examples/common.cpp examples/common.h
 	$(CXX) $(CXXFLAGS) -c examples/common.cpp -o common.o
 
+common_server.o: examples/server/common_server.cpp examples/server/common_server.h
+	$(CXX) $(CXXFLAGS) -c examples/server/common_server.cpp -o common_server.o
+
 clean:
-	rm -vf *.o main quantize perplexity embedding
+	rm -vf *.o main server quantize perplexity embedding
 
 main: examples/main/main.cpp ggml.o llama.o common.o
 	$(CXX) $(CXXFLAGS) examples/main/main.cpp ggml.o llama.o common.o -o main $(LDFLAGS)
 	@echo
 	@echo '====  Run ./main -h for help.  ===='
+	@echo
+
+server: examples/server/server.cpp ggml.o llama.o common_server.o
+	$(CXX) $(CXXFLAGS) examples/server/server.cpp ggml.o llama.o common_server.o -o server $(LDFLAGS)
+	@echo
+	@echo '====  Run ./server -h for help.  ===='
 	@echo
 
 quantize: examples/quantize/quantize.cpp ggml.o llama.o

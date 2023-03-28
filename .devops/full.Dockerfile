@@ -10,6 +10,9 @@ RUN pip install --upgrade pip setuptools wheel \
 
 WORKDIR /app
 
+RUN wget https://boostorg.jfrog.io/artifactory/main/release/1.81.0/source/boost_1_81_0.tar.gz \
+    && tar xzf boost_1_81_0.tar.gz -C . --strip-components=1 boost_1_81_0/boost
+
 COPY . .
 
 RUN make

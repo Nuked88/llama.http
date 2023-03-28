@@ -5,7 +5,7 @@
 .vscode/
 .DS_Store
 
-.build/
+boost/
 build/
 build-em/
 build-debug/
@@ -16,18 +16,34 @@ build-sanitize-addr/
 build-sanitize-thread/
 
 models/*
+*.bin
+*.exe
 
 /main
 /quantize
-/result
-/perplexity
-/embedding
+/server
 
 arm_neon.h
 compile_commands.json
 
+# Windows CMake files
+*.vcxproj
+*.filters
+*.cmake
+*.sln
+*.user
+x64/
+Debug/
+Release/
+CMakeFiles/
+CMakeCache.txt
+*.dir/
+.hypothesis/
+
+
 .envrc
 .direnv/
+
 
 .venv
 __pycache__
