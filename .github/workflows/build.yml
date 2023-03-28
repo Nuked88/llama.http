@@ -126,8 +126,7 @@ jobs:
 
     needs:
       - ubuntu-latest-make
-      - ubuntu-latest-cmake
-      - windows-latest-cmake
+      - windows-latest
 
     steps:
       - name: Download artifacts
