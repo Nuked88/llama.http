@@ -39,7 +39,7 @@ jobs:
           make
 
       - name: Zip executables
-        run: zip llama.http-linux.zip main quantize perplexity
+        run: zip llama.http-${{ env.BRANCH_NAME }}-${{ steps.commit.outputs.short }}-bin-linux-x64.zip main quantize perplexity
 
       - name: Clear
         run: |
