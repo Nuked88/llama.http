@@ -124,17 +124,9 @@ bool gpt_params_parse(int argc, char ** argv, gpt_params & params) {
                 break;
             }
             params.model = argv[i];
-        } else if (arg == "-i" || arg == "--interactive") {
-            params.interactive = true;
-        } else if (arg == "--embedding") {
+        }  else if (arg == "--embedding") {
             params.embedding = true;
-        } else if (arg == "--interactive-start") {
-            params.interactive = true;
-        } else if (arg == "--interactive-first") {
-            params.interactive_start = true;
-        } else if (arg == "-ins" || arg == "--instruct") {
-            params.instruct = true;
-        } else if (arg == "--color") {
+        }   else if (arg == "--color") {
             params.use_color = true;
         } else if (arg == "--mlock") {
             params.use_mlock = true;
@@ -169,6 +161,12 @@ bool gpt_params_parse(int argc, char ** argv, gpt_params & params) {
                 break;
             }
             params.input_prefix = argv[i];
+        } else if (arg == "--in-suffix") {
+            if (++i >= argc) {
+                invalid_param = true;
+                break;
+            }
+            params.input_suffix = argv[i];
         } else if (arg == "-srv" || arg == "--server-port") {
             params.server_start = true;
         } else if (arg == "-sp" || arg == "--server-port") {
@@ -210,7 +208,8 @@ void gpt_print_usage(int /*argc*/, char ** argv, const gpt_params & params) {
     fprintf(stderr, "  -p PROMPT, --prompt PROMPT\n");
     fprintf(stderr, "                        prompt to start generation with (default: empty)\n");
     fprintf(stderr, "  --random-prompt       start with a randomized prompt.\n");
-    fprintf(stderr, "  --in-prefix STRING    string to prefix user inputs with (default: empty)\n");
+    fprintf(stderr, "  --in-prefix STRING    string to prefix user inputs with (default: \\n\\n### Instruction:\\n\\n)\n");
+    fprintf(stderr, "  --in-suffix STRING    string to suffix user inputs with (default: \\n\\n### Response:\\n\\n)\n");
     fprintf(stderr, "  -f FNAME, --file FNAME\n");
     fprintf(stderr, "                        prompt file to start generation.\n");
     fprintf(stderr, "  -n N, --n_predict N   number of tokens to predict (default: %d, -1 - infinity)\n", params.n_predict);

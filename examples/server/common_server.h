@@ -34,6 +34,7 @@ struct gpt_params {
     std::string model  = "models/lamma-7B/ggml-model.bin"; // model path
     std::string prompt = "";
     std::string input_prefix = ""; // string to prefix user inputs with
+    std::string input_suffix = ""; // string to suffix user inputs with
     std::string server_address = "0.0.0.0"; //server address
 
 

@@ -284,9 +284,27 @@ int main(int argc, char ** argv) {
     params.n_keep    = std::min(params.n_keep,    (int) embd_inp.size());
 
     // prefix & suffix for instruct mode
-    const auto inp_pfx = ::llama_tokenize(ctx, "\n\n### Instruction:\n\n", true);
-    const auto inp_sfx = ::llama_tokenize(ctx, "\n\n### Response:\n\n", false);
 
+
+    if (!params.input_prefix.empty()) {
+        const auto inp_pfx = ::llama_tokenize(ctx, "\n\n### Instruction:\n\n", true);
+                    
+    }
+    else{
+        const auto inp_pfx = ::llama_tokenize(ctx, "\n\n### Instruction:\n\n", true);
+        
+    }
+
+    if (!params.input_suffix.empty()) {
+        const auto inp_sfx = ::llama_tokenize(ctx, "\n\n### Instruction:\n\n", false);
+                    
+    }
+    else{
+        const auto inp_sfx = ::llama_tokenize(ctx, "\n\n### Response:\n\n", false);
+        
+    }
+
+    
     // in instruct mode, we inject a prefix and a suffix to each input by the user
     
     params.interactive = false;
