@@ -285,22 +285,24 @@ int main(int argc, char ** argv) {
 
     // prefix & suffix for instruct mode
 
-    const auto inp_sfx;
+    std::vector<llama_token> inp_sfx;
+    std::vector<llama_token> inp_pfx;
+
     if (!params.input_prefix.empty()) {
-        const auto inp_pfx = ::llama_tokenize(ctx, "\n\n### Instruction:\n\n", true);
+        inp_pfx = ::llama_tokenize(ctx, "\n\n###"+params.input_prefix+"\n\n", true);
                     
     }
     else{
-        const auto inp_pfx = ::llama_tokenize(ctx, "\n\n### Instruction:\n\n", true);
+        inp_pfx = ::llama_tokenize(ctx, "\n\n### Instruction:\n\n", true);
         
     }
 
     if (!params.input_suffix.empty()) {
-         inp_sfx = ::llama_tokenize(ctx, "\n\n### Instruction:\n\n", false);
+        inp_sfx = ::llama_tokenize(ctx, "\n\n"+params.input_suffix+"\n\n", false);
                     
     }
     else{
-         inp_sfx = ::llama_tokenize(ctx, "\n\n### Response:\n\n", false);
+        inp_sfx = ::llama_tokenize(ctx, "\n\n### Response:\n\n", false);
         
     }
 
