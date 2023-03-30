@@ -285,7 +285,7 @@ int main(int argc, char ** argv) {
 
     // prefix & suffix for instruct mode
 
-
+    const auto inp_sfx;
     if (!params.input_prefix.empty()) {
         const auto inp_pfx = ::llama_tokenize(ctx, "\n\n### Instruction:\n\n", true);
                     
@@ -296,11 +296,11 @@ int main(int argc, char ** argv) {
     }
 
     if (!params.input_suffix.empty()) {
-        const auto inp_sfx = ::llama_tokenize(ctx, "\n\n### Instruction:\n\n", false);
+         inp_sfx = ::llama_tokenize(ctx, "\n\n### Instruction:\n\n", false);
                     
     }
     else{
-        const auto inp_sfx = ::llama_tokenize(ctx, "\n\n### Response:\n\n", false);
+         inp_sfx = ::llama_tokenize(ctx, "\n\n### Response:\n\n", false);
         
     }
 
