@@ -564,10 +564,7 @@ static void quantize_row_q4_0(const float * restrict x, void * restrict vy, int 
         }
     }
 #elif __ARM_NEON
-    uint8_t pp[QK/2];
     for (int i = 0; i < nb; i++) {
-        float amax = 0.0f; // absolute max
-
         float32x4_t srcv [8];
         float32x4_t asrcv[8];
         float32x4_t amaxv[8];
@@ -579,7 +576,8 @@ static void quantize_row_q4_0(const float * restrict x, void * restrict vy, int 
         for (int l = 0; l < 2; l++) amaxv[4*l] = vmaxq_f32(amaxv[4*l], amaxv[4*l+2]);
         for (int l = 0; l < 1; l++) amaxv[8*l] = vmaxq_f32(amaxv[8*l], amaxv[8*l+4]);
 
-        amax = MAX(
+        // absolute max
+        const float amax = MAX(
                 MAX(vgetq_lane_f32(amaxv[0], 0), vgetq_lane_f32(amaxv[0], 1)),
                 MAX(vgetq_lane_f32(amaxv[0], 2), vgetq_lane_f32(amaxv[0], 3)));
 
@@ -593,11 +591,9 @@ static void quantize_row_q4_0(const float * restrict x, void * restrict vy, int 
             const float32x4_t vf = vaddq_f32(v, vdupq_n_f32(8.5f));
             const int32x4_t   vi = vcvtq_s32_f32(vf);
 
-            pp[2*l + 0] = vgetq_lane_s32(vi, 0) | (vgetq_lane_s32(vi, 1) << 4);
-            pp[2*l + 1] = vgetq_lane_s32(vi, 2) | (vgetq_lane_s32(vi, 3) << 4);
+            y[i].qs[2*l + 0] = vgetq_lane_s32(vi, 0) | (vgetq_lane_s32(vi, 1) << 4);
+            y[i].qs[2*l + 1] = vgetq_lane_s32(vi, 2) | (vgetq_lane_s32(vi, 3) << 4);
         }
-
-        memcpy(y[i].qs, pp, sizeof(pp));
     }
 #elif defined(__AVX2__)
     for (int i = 0; i < nb; i++) {
@@ -665,7 +661,6 @@ static void quantize_row_q4_0(const float * restrict x, void * restrict vy, int 
         _mm_storeu_si128( ( __m128i* )y[i].qs, res );
     }
 #elif defined(__wasm_simd128__)
-    uint8_t pp[QK/2];
     for (int i = 0; i < nb; i++) {
         float amax = 0.0f; // absolute max
 
@@ -694,11 +689,9 @@ static void quantize_row_q4_0(const float * restrict x, void * restrict vy, int 
             const v128_t vf = wasm_f32x4_add(v, wasm_f32x4_splat(8.5f));
             const v128_t vi = wasm_i32x4_trunc_sat_f32x4(vf);
 
-            pp[2*l + 0] = wasm_i32x4_extract_lane(vi, 0) | (wasm_i32x4_extract_lane(vi, 1) << 4);
-            pp[2*l + 1] = wasm_i32x4_extract_lane(vi, 2) | (wasm_i32x4_extract_lane(vi, 3) << 4);
+            y[i].qs[2*l + 0] = wasm_i32x4_extract_lane(vi, 0) | (wasm_i32x4_extract_lane(vi, 1) << 4);
+            y[i].qs[2*l + 1] = wasm_i32x4_extract_lane(vi, 2) | (wasm_i32x4_extract_lane(vi, 3) << 4);
         }
-
-        memcpy(y[i].qs, pp, sizeof(pp));
     }
 #else
     // scalar
@@ -750,11 +743,11 @@ static void quantize_row_q4_1_reference(const float * restrict x, void * restric
 static void quantize_row_q4_1(const float * restrict x, void * restrict vy, int k) {
     assert(k % QK == 0);
 
-#if defined(__AVX2__)
     const int nb = k / QK;
 
     block_q4_1 * restrict y = vy;
 
+#if defined(__AVX2__)
     for (int i = 0; i < nb; i++) {
         // Load elements into 4 AVX vectors
         __m256 v0 = _mm256_loadu_ps( x );
@@ -827,6 +820,41 @@ static void quantize_row_q4_1(const float * restrict x, void * restrict vy, int 
         // Compress the vector into 4 bit/value, and store
         __m128i res = packNibbles( i0 );
         _mm_storeu_si128( ( __m128i* )y[i].qs, res );
+    }
+#elif __ARM_NEON
+    for (int i = 0; i < nb; i++) {
+        float32x4_t srcv[8];
+        float32x4_t minv[8];
+        float32x4_t maxv[8];
+
+        for (int l = 0; l < 8; l++) srcv[l] = vld1q_f32(x + i*32 + 4*l);
+
+        for (int l = 0; l < 4; l++) minv[2*l] = vminq_f32(srcv[2*l], srcv[2*l + 1]);
+        for (int l = 0; l < 2; l++) minv[4*l] = vminq_f32(minv[4*l], minv[4*l + 2]);
+        for (int l = 0; l < 1; l++) minv[8*l] = vminq_f32(minv[8*l], minv[8*l + 4]);
+
+        for (int l = 0; l < 4; l++) maxv[2*l] = vmaxq_f32(srcv[2*l], srcv[2*l + 1]);
+        for (int l = 0; l < 2; l++) maxv[4*l] = vmaxq_f32(maxv[4*l], maxv[4*l + 2]);
+        for (int l = 0; l < 1; l++) maxv[8*l] = vmaxq_f32(maxv[8*l], maxv[8*l + 4]);
+
+        const float min = vminvq_f32(minv[0]);
+        const float max = vmaxvq_f32(maxv[0]);
+
+        const float d = (max - min) / ((1 << 4) - 1);
+        const float id = d ? 1.0f/d : 0.0f;
+
+        y[i].d = d;
+        y[i].m = min;
+
+        const float32x4_t minv0 = vdupq_n_f32(min);
+
+        for (int l = 0; l < 8; l++) {
+            const float32x4_t v  = vmulq_n_f32(vsubq_f32(srcv[l], minv0), id);
+            const int32x4_t   vi = vcvtq_s32_f32(v);
+
+            y[i].qs[2*l + 0] = vgetq_lane_s32(vi, 0) | (vgetq_lane_s32(vi, 1) << 4);
+            y[i].qs[2*l + 1] = vgetq_lane_s32(vi, 2) | (vgetq_lane_s32(vi, 3) << 4);
+        }
     }
 #else
     // scalar
@@ -986,6 +1014,50 @@ static void dequantize_row_q4_1(const void * restrict vx, float * restrict y, in
                 const __m256 result = _mm256_add_ps(_mm256_mul_ps(vf[j], d_v), d_m);
                 _mm256_storeu_ps(y + i * QK + l + j*8, result);
             }
+        }
+    }
+#elif defined(__ARM_NEON)
+    for (int i = 0; i < nb; i++) {
+        const float32x4_t vd = vdupq_n_f32(x[i].d);
+        const float32x4_t vm = vdupq_n_f32(x[i].m);
+
+        const uint8_t * restrict pp = x[i].qs;
+
+        for (int l = 0; l < QK; l += 16) {
+            // Load 16x4-bit integers into 8x8-bit integers
+            const uint8x8_t v8 = vld1_u8(pp + l/2);
+
+            // Expand 4-bit qs to 8-bit bytes
+            const uint8x8_t v0 = vand_u8(v8, vdup_n_u8(0x0f));
+            const uint8x8_t v1 = vshr_n_u8(v8, 4);
+
+            // Interleave and combine
+            const uint8x8_t vx_0 = vzip1_u8(v0, v1);
+            const uint8x8_t vx_1 = vzip2_u8(v0, v1);
+
+            const uint8x16_t vq = vcombine_u8(vx_0, vx_1);
+
+            // convert to 2x uint16x8_t
+            const uint16x8_t vi_0 = vmovl_u8(vget_low_u8 (vq));
+            const uint16x8_t vi_1 = vmovl_u8(vget_high_u8(vq));
+
+            // convert to 4x float32x4_t
+            const float32x4_t vf_0 = vcvtq_f32_u32(vmovl_u16(vget_low_u16 (vi_0)));
+            const float32x4_t vf_1 = vcvtq_f32_u32(vmovl_u16(vget_high_u16(vi_0)));
+            const float32x4_t vf_2 = vcvtq_f32_u32(vmovl_u16(vget_low_u16 (vi_1)));
+            const float32x4_t vf_3 = vcvtq_f32_u32(vmovl_u16(vget_high_u16(vi_1)));
+
+            // multiply by d and add m
+            const float32x4_t r0 = vmlaq_f32(vm, vf_0, vd);
+            const float32x4_t r1 = vmlaq_f32(vm, vf_1, vd);
+            const float32x4_t r2 = vmlaq_f32(vm, vf_2, vd);
+            const float32x4_t r3 = vmlaq_f32(vm, vf_3, vd);
+
+            // Store
+            vst1q_f32(y + i*QK + l +  0, r0);
+            vst1q_f32(y + i*QK + l +  4, r1);
+            vst1q_f32(y + i*QK + l +  8, r2);
+            vst1q_f32(y + i*QK + l + 12, r3);
         }
     }
 #else
@@ -1225,7 +1297,7 @@ static inline void __avx_f32cx8_store(ggml_fp16_t *x, __m256 y) {
     _mm256_storeu_ps(arr, y);
 
     for (int i = 0; i < 8; i++)
-        x[i] = GGML_FP16_TO_FP32(arr[i]);
+        x[i] = GGML_FP32_TO_FP16(arr[i]);
 }
 #define GGML_F32Cx8_LOAD(x)     __avx_f32cx8_load(x)
 #define GGML_F32Cx8_STORE(x, y) __avx_f32cx8_store(x, y)
@@ -1757,7 +1829,6 @@ static void ggml_vec_dot_q4_0(const int n, float * restrict s, const void * rest
 
     const int superblock_size = 8;
     const int superblock_count = nb / superblock_size;
-    const int remainder = nb % superblock_size;
 
     for (int superblock_ix = 0; superblock_ix < superblock_count; superblock_ix += 1) {
         int i = superblock_ix * superblock_size;
@@ -2637,6 +2708,9 @@ struct ggml_context * ggml_init(struct ggml_init_params params) {
     static bool is_first_call = true;
 
     if (is_first_call) {
+        // initialize time system (required on Windows)
+        ggml_time_init();
+
         // initialize GELU, SILU and EXP F32 tables
         {
             const uint64_t t_start = ggml_time_us(); UNUSED(t_start);
