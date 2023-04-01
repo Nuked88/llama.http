@@ -255,7 +255,7 @@ endif()
 #
 
 if (LLAMA_BUILD_TESTS AND NOT CMAKE_JS_VERSION)
-    include(CTest)
+    enable_testing()
     add_subdirectory(tests)
 endif ()
 
