@@ -15,7 +15,7 @@ if [[ $arg1 == '--convert' || $arg1 == '-c' ]]; then
 elif [[ $arg1 == '--quantize' || $arg1 == '-q' ]]; then
     ./quantize $arg2
 elif [[ $arg1 == '--run' || $arg1 == '-r' ]]; then
-    ./main $arg2
+    ./server $arg2
 elif [[ $arg1 == '--all-in-one' || $arg1 == '-a' ]]; then
     echo "Converting PTH to GGML..."
     for i in `ls $1/$2/ggml-model-f16.bin*`; do

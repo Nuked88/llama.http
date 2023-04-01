@@ -16,6 +16,6 @@ RUN make
 
 FROM ubuntu:$UBUNTU_VERSION as runtime
 
-COPY --from=build /app/main /main
+COPY --from=build /app/server /server
 
 ENTRYPOINT [ "/server" ]

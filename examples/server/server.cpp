@@ -268,11 +268,14 @@ int main(int argc, char ** argv) {
         return 0;
     }
 
+params.prompt.insert(0, 1, ' ');
+while (true) {
     // Add a space in front of the first character to match OG llama tokenizer behavior
-    params.prompt.insert(0, 1, ' ');
-
+    
+  
     // tokenize the prompt
     auto embd_inp = ::llama_tokenize(ctx, params.prompt, true);
+    
 
     const int n_ctx = llama_n_ctx(ctx);
 
@@ -358,7 +361,7 @@ int main(int argc, char ** argv) {
 
 
 
- while (true) {
+
     int n_past     = 0;
     int n_remain   = params.n_predict;
     int n_consumed = 0;
