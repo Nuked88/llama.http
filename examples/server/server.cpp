@@ -268,7 +268,36 @@ int main(int argc, char ** argv) {
         return 0;
     }
 
-params.prompt.insert(0, 1, ' ');
+    params.prompt.insert(0, 1, ' ');
+    
+
+
+
+    // prefix & suffix for instruct mode
+
+    std::vector<llama_token> inp_sfx;
+    std::vector<llama_token> inp_pfx;
+
+    if (!params.input_prefix.empty()) {
+        printf("Not Empty P");
+        inp_pfx = ::llama_tokenize(ctx, "\n\n###"+params.input_prefix+"\n\n", true);
+                    
+    }
+    else{
+        inp_pfx = ::llama_tokenize(ctx, "\n\n### Instruction:\n\n", true);
+        
+    }
+
+    if (!params.input_suffix.empty()) {
+        printf("Not Empty S");
+        inp_sfx = ::llama_tokenize(ctx, "\n\n"+params.input_suffix+"\n\n", false);
+                    
+    }
+    else{
+        inp_sfx = ::llama_tokenize(ctx, "\n\n### Response:\n\n", false);
+        
+    }
+
 while (true) {
     // Add a space in front of the first character to match OG llama tokenizer behavior
     
@@ -286,28 +315,7 @@ while (true) {
 
     params.n_keep    = std::min(params.n_keep,    (int) embd_inp.size());
 
-    // prefix & suffix for instruct mode
 
-    std::vector<llama_token> inp_sfx;
-    std::vector<llama_token> inp_pfx;
-
-    if (!params.input_prefix.empty()) {
-        inp_pfx = ::llama_tokenize(ctx, "\n\n###"+params.input_prefix+"\n\n", true);
-                    
-    }
-    else{
-        inp_pfx = ::llama_tokenize(ctx, "\n\n### Instruction:\n\n", true);
-        
-    }
-
-    if (!params.input_suffix.empty()) {
-        inp_sfx = ::llama_tokenize(ctx, "\n\n"+params.input_suffix+"\n\n", false);
-                    
-    }
-    else{
-        inp_sfx = ::llama_tokenize(ctx, "\n\n### Response:\n\n", false);
-        
-    }
 
     
     // in instruct mode, we inject a prefix and a suffix to each input by the user
@@ -355,12 +363,6 @@ while (true) {
     
     int32_t completion_tokens = 0;
     int32_t  prompt_tokens = 0;
-
-
-
-
-
-
 
     int n_past     = 0;
     int n_remain   = params.n_predict;
@@ -489,13 +491,10 @@ while (true) {
        
        /*****************************************************************/
 
-     
-                
-                
 
         // end of text token
         if (embd.back() == llama_token_eos()) {
-          
+                printf("EOS");
                 break;
            
         }
@@ -507,8 +506,6 @@ while (true) {
         }
     }
 
-
-
                 // build the JSON response
                 std::time_t timestamp = std::time(nullptr);
                 std::cout << std::asctime(std::localtime(&timestamp));
@@ -516,7 +513,10 @@ while (true) {
                 nlohmann::json json_response;
                 json_response["created"] = timestamp;
                 json_response["model"] = params.model;
-                json_response["output"] = output;
+                json_response["choices"]["message"] ["role"] = "assistant";
+                json_response["choices"]["message"] ["content"] = output;
+                json_response["choices"]["message"] ["finish_reason"] = "stop"; //TODO
+                json_response["choices"]["message"] ["index"] = 0; //TODO
                 json_response["usage"]["prompt_tokens"] = prompt_tokens;
                 json_response["usage"]["completion_tokens"] = completion_tokens;
                 json_response["usage"]["total_tokens"] = completion_tokens + prompt_tokens;
