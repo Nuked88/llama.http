@@ -99,10 +99,6 @@ jobs:
           echo 'int main(void){unsigned int a[4];__cpuid(a,7);return !(a[1]&65536);}' >> avx512f.c
           & $cl /O2 /GS- /kernel avx512f.c /link /nodefaultlib /entry:main
           .\avx512f.exe && echo "AVX512F: YES" && ( echo HAS_AVX512F=1 >> $env:GITHUB_ENV ) || echo "AVX512F: NO"
-<<<<<<< HEAD
-
-=======
->>>>>>> 3525899277d2e2bdc8ec3f0e6e40c47251608700
 
       - name: Test
         id: cmake_test
