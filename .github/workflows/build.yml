@@ -85,7 +85,7 @@ jobs:
         id: depends
         run: |
           sudo apt-get update
-          sudo apt-get install build-essential
+          sudo apt-get install build-essential gcc-8
           wget https://boostorg.jfrog.io/artifactory/main/release/1.81.0/source/boost_1_81_0.tar.gz
           tar xzf boost_1_81_0.tar.gz -C . --strip-components=1 boost_1_81_0/boost
 
@@ -120,7 +120,7 @@ jobs:
             llama.http-${{ env.BRANCH_NAME }}-${{ steps.commit.outputs.short }}-bin-linux-x64.zip
 
 
-  windows-latest:
+  windows-latest-cmake:
     runs-on: windows-latest
     env:
       OPENBLAS_VERSION: 0.3.23
@@ -331,8 +331,8 @@ jobs:
     runs-on: ubuntu-latest
 
     needs:
-      - ubuntu-focal-make
-      - ubuntu-latest-cmake
+      #- ubuntu-focal-make
+      - ubuntu-latest-cmake-sanitizer
       - windows-latest-cmake
       - windows-latest-cmake-cublas
 
