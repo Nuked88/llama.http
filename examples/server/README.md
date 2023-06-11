@@ -2,13 +2,13 @@
 
 Start a fast ChatGPT-like model on your pc and interact remotely with it via HTTP requests
 
-This is a continuation of the repository https://github.com/Nuked88/alpaca.http
+This is a continuation of the repository https://github.com/Nuked88/alpaca.http and is **NOT** the same as the official server of llama.cpp
 
 No performance seems to have been lost, the result is not streamed so it may look like it will take longer but it really isn't.
 
-## Get Started (7B)
+## Get Started
 
-This project support all the models currently supported by the official llama.cpp since this current commit [HERE A LIST](https://github.com/Nuked88/alpaca.http)
+This project support all the models currently supported by the official llama.cpp since this current commit [HERE A LIST](https://github.com/Nuked88/llama.http#description)
 
 
 Once you've downloaded the model weights and placed them into the same directory as the `server` or `server.exe` executable, run:
