@@ -1,7 +1,9 @@
 #include "common.h"
 #include "llama.h"
+#include "build-info.h"
 
 #include <cmath>
+#include <ctime>
 
 std::vector<float> softmax(const std::vector<float>& logits) {
     std::vector<float> probs(logits.size());
@@ -23,33 +25,68 @@ void perplexity(llama_context * ctx, const gpt_params & params) {
     // Download: https://s3.amazonaws.com/research.metamind.io/wikitext/wikitext-2-raw-v1.zip?ref=salesforce-research
     // Run `./perplexity -m models/7B/ggml-model-q4_0.bin -f wiki.test.raw`
     // Output: `perplexity: 13.5106 [114/114]`
+    // BOS tokens will be added for each chunk before eval
     auto tokens = ::llama_tokenize(ctx, params.prompt, true);
 
-    int count = 0;
-    int seq_count = tokens.size() / params.n_ctx;
+    int count   = 0;
+
+    const int n_chunk = tokens.size() / params.n_ctx;
+    const int n_vocab = llama_n_vocab(ctx);
+    const int n_batch = params.n_batch;
 
     double nll = 0.0;
+    fprintf(stderr, "%s: calculating perplexity over %d chunks, batch_size=%d\n", __func__, n_chunk, n_batch);
 
-    fprintf(stderr, "%s : calculating perplexity over %d chunks\n", __func__, seq_count);
+    for (int i = 0; i < n_chunk; ++i) {
+        const int start =     i * params.n_ctx;
+        const int end   = start + params.n_ctx;
 
-    for (int i = 0; i < seq_count; ++i) {
-        int start = i * params.n_ctx;
-        int end = start + params.n_ctx - 1; // TODO: this is not optimal, e.g. it makes the batch 511 instead of 512
-                                            //       it is better to always be power of 2 for better performance
-        std::vector<llama_token> embd(tokens.begin() + start, tokens.begin() + end);
-        auto start_t = std::chrono::high_resolution_clock::now();
-        if (llama_eval(ctx, embd.data(), embd.size(), 0, params.n_threads)) {
-            fprintf(stderr, "%s : failed to eval\n", __func__);
-            return;
+        const int num_batches = (params.n_ctx + n_batch - 1) / n_batch;
+
+        std::vector<float> logits;
+
+        const auto t_start = std::chrono::high_resolution_clock::now();
+
+        for (int j = 0; j < num_batches; ++j) {
+            const int batch_start = start + j * n_batch;
+            const int batch_size  = std::min(end - batch_start, n_batch);
+
+            // save original token and restore it after eval
+            const auto token_org = tokens[batch_start];
+
+            // add BOS token for the first batch of each chunk
+            if (j == 0) {
+                tokens[batch_start] = llama_token_bos();
+            }
+
+            if (llama_eval(ctx, tokens.data() + batch_start, batch_size, j * n_batch, params.n_threads)) {
+                fprintf(stderr, "%s : failed to eval\n", __func__);
+                return;
+            }
+
+            // restore the original token in case it was set to BOS
+            tokens[batch_start] = token_org;
+
+            const auto batch_logits = llama_get_logits(ctx);
+            logits.insert(logits.end(), batch_logits, batch_logits + batch_size * n_vocab);
         }
-        auto end_t = std::chrono::high_resolution_clock::now();
+
+        const auto t_end = std::chrono::high_resolution_clock::now();
+
         if (i == 0) {
-            const float seconds = std::chrono::duration<float>(end_t - start_t).count();
-            printf("%.2f seconds per pass - ETA %.2f hours\n", seconds, (seconds * seq_count) / (60.0*60.0));
+            const float t_total = std::chrono::duration<float>(t_end - t_start).count();
+            fprintf(stderr, "%s: %.2f seconds per pass - ETA ", __func__, t_total);
+            int total_seconds = (int)(t_total * n_chunk);
+            if (total_seconds >= 60*60) {
+                fprintf(stderr, "%d hours ", total_seconds / (60*60));
+                total_seconds = total_seconds % (60*60);
+            }
+            fprintf(stderr, "%d minutes\n", total_seconds / 60);
         }
+
         // We get the logits for all the tokens in the context window (params.n_ctx)
         // from llama_eval above.  Now, based on https://huggingface.co/docs/transformers/perplexity,
-        // calculate the perplexity over the last half the window (so the model always has
+        // calculate the perplexity over the last half of the window (so the model always has
         // some context to predict the token).
         //
         // We rely on the fact that attention in the forward pass only looks at previous
@@ -59,15 +96,14 @@ void perplexity(llama_context * ctx, const gpt_params & params) {
         // Example, we have a context window of 512, we will compute perplexity for each of the
         // last 256 tokens.  Then, we split the input up into context window size chunks to
         // process the entire prompt.
-
-        auto logits = llama_get_logits(ctx);
-        for (int j = params.n_ctx / 2; j < params.n_ctx - 1; ++j) {
+        for (int j = std::min(512, params.n_ctx / 2); j < params.n_ctx - 1; ++j) {
             // Calculate probability of next token, given the previous ones.
-            int n_vocab = llama_n_vocab(ctx);
-            std::vector<float> tok_logits(
-                logits + j * n_vocab,
-                logits + (j + 1) * n_vocab);
+            const std::vector<float> tok_logits(
+                logits.begin() + (j + 0) * n_vocab,
+                logits.begin() + (j + 1) * n_vocab);
+
             const float prob = softmax(tok_logits)[tokens[start + j + 1]];
+
             nll += -std::log(prob);
             ++count;
         }
@@ -80,50 +116,42 @@ void perplexity(llama_context * ctx, const gpt_params & params) {
 
 int main(int argc, char ** argv) {
     gpt_params params;
-    params.model = "models/llama-7B/ggml-model.bin";
 
+    params.n_batch = 512;
     if (gpt_params_parse(argc, argv, params) == false) {
         return 1;
     }
 
     params.perplexity = true;
+    params.n_batch = std::min(params.n_batch, params.n_ctx);
 
     if (params.n_ctx > 2048) {
         fprintf(stderr, "%s: warning: model does not support context sizes greater than 2048 tokens (%d specified);"
                 "expect poor results\n", __func__, params.n_ctx);
     }
 
-    if (params.seed <= 0) {
+    fprintf(stderr, "%s: build = %d (%s)\n", __func__, BUILD_NUMBER, BUILD_COMMIT);
+
+    if (params.seed < 0) {
         params.seed = time(NULL);
     }
 
-    fprintf(stderr, "%s: seed = %d\n", __func__, params.seed);
+    fprintf(stderr, "%s: seed  = %d\n", __func__, params.seed);
 
     std::mt19937 rng(params.seed);
     if (params.random_prompt) {
         params.prompt = gpt_random_prompt(rng);
     }
 
+    llama_init_backend();
+
     llama_context * ctx;
 
-    // load the model
-    {
-        auto lparams = llama_context_default_params();
-
-        lparams.n_ctx      = params.n_ctx;
-        lparams.n_parts    = params.n_parts;
-        lparams.seed       = params.seed;
-        lparams.f16_kv     = params.memory_f16;
-        lparams.logits_all = params.perplexity;
-        lparams.use_mlock  = params.use_mlock;
-        lparams.embedding  = params.embedding;
-
-        ctx = llama_init_from_file(params.model.c_str(), lparams);
-
-        if (ctx == NULL) {
-            fprintf(stderr, "%s: error: failed to load model '%s'\n", __func__, params.model.c_str());
-            return 1;
-        }
+    // load the model and apply lora adapter, if any
+    ctx = llama_init_from_gpt_params(params);
+    if (ctx == NULL) {
+        fprintf(stderr, "%s: error: unable to load model\n", __func__);
+        return 1;
     }
 
     // print system information

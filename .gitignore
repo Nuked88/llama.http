@@ -1,9 +1,15 @@
 *.o
 *.a
+.DS_Store
+.build/
 .cache/
+.direnv/
+.envrc
+.swiftpm
+.venv
+.clang-tidy
 .vs/
 .vscode/
-.DS_Store
 
 boost/
 build/
@@ -11,6 +17,9 @@ build-em/
 build-debug/
 build-release/
 build-static/
+build-cublas/
+build-opencl/
+build-metal/
 build-no-accel/
 build-sanitize-addr/
 build-sanitize-thread/
@@ -22,11 +31,19 @@ models/*
 /main
 /quantize
 /server
+
+/main
+/quantize
+/quantize-stats
 /result
 /perplexity
 /embedding
+/benchmark-matmult
+/vdot
 /Pipfile
+/libllama.so
 
+build-info.h
 arm_neon.h
 compile_commands.json
 
@@ -51,4 +68,12 @@ CMakeCache.txt
 
 .venv
 __pycache__
-.swiftpm
+
+zig-out/
+zig-cache/
+
+ppl-*.txt
+qnt-*.txt
+perf-*.txt
+
+examples/jeopardy/results.txt
