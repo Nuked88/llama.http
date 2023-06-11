@@ -136,7 +136,7 @@ jobs:
         id: pack_artifacts
         if: ${{ ( github.event_name == 'push' && github.ref == 'refs/heads/master' ) || github.event.inputs.create_release == 'true' }}
         run: |
-          7z a llama.http-${{ env.BRANCH_NAME }}-${{ steps.commit.outputs.short }}-bin-deb-lastest-sanitizer-x64.zip  ./build/*
+          7z a llama.http-${{ env.BRANCH_NAME }}-${{ steps.commit.outputs.short }}-bin-deb-lastest-sanitizer-x64.zip  ./build/bin/*
 
       - name: Upload artifacts
         if: ${{ ( github.event_name == 'push' && github.ref == 'refs/heads/master' ) || github.event.inputs.create_release == 'true' }}
