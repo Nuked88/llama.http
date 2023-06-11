@@ -585,7 +585,7 @@ while (true) {
                 boost::beast::http::response<boost::beast::http::string_body> response;
                 response.version(request.version());
                 response.result(boost::beast::http::status::ok);
-                response.set(boost::beast::http::field::server, "Alpaca.http server");
+                response.set(boost::beast::http::field::server, "llama.http server");
                 response.set(boost::beast::http::field::content_type, "application/json");
                 response.keep_alive(request.keep_alive());
                 response.body() =  json_response.dump();

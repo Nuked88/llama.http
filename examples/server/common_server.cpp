@@ -132,7 +132,55 @@ bool gpt_params_parse(int argc, char ** argv, gpt_params & params) {
             params.use_mlock = true;
         } else if (arg == "--mtest") {
             params.mem_test = true;
-        } else if (arg == "--verbose-prompt") {
+        }
+        
+        else if (arg == "--gpu-layers" || arg == "-ngl" || arg == "--n-gpu-layers") {
+            if (++i >= argc) {
+                invalid_param = true;
+                break;
+            }
+#ifdef LLAMA_SUPPORTS_GPU_OFFLOAD
+            params.n_gpu_layers = std::stoi(argv[i]);
+#else
+            fprintf(stderr, "warning: not compiled with GPU offload support, --n-gpu-layers option will be ignored\n");
+            fprintf(stderr, "warning: see main README.md for information on enabling GPU BLAS support\n");
+#endif
+        } else if (arg == "--main-gpu" || arg == "-mg") {
+            if (++i >= argc) {
+                invalid_param = true;
+                break;
+            }
+#ifdef GGML_USE_CUBLAS
+            params.main_gpu = std::stoi(argv[i]);
+#else
+      fprintf(stderr, "warning: llama.cpp was compiled without cuBLAS. It is not possible to set a main GPU.\n");
+#endif
+        } else if (arg == "--tensor-split" || arg == "-ts") {
+            if (++i >= argc) {
+                invalid_param = true;
+                break;
+            }
+#ifdef GGML_USE_CUBLAS
+            std::string arg_next = argv[i];
+
+            // split string by , and /
+            const std::regex regex{R"([,/]+)"};
+            std::sregex_token_iterator it{arg_next.begin(), arg_next.end(), regex, -1};
+            std::vector<std::string> split_arg{it, {}};
+            GGML_ASSERT(split_arg.size() <= LLAMA_MAX_DEVICES);
+
+            for (size_t i = 0; i < LLAMA_MAX_DEVICES; ++i) {
+                if (i < split_arg.size()) {
+                    params.tensor_split[i] = std::stof(split_arg[i]);
+                } else {
+                    params.tensor_split[i] = 0.0f;
+                }
+            }
+#else
+      fprintf(stderr, "warning: llama.cpp was compiled without cuBLAS. It is not possible to set a tensor split.\n");
+#endif // GGML_USE_CUBLAS
+        
+         }else if (arg == "--verbose-prompt") {
             params.verbose_prompt = true;
         } else if (arg == "-r" || arg == "--reverse-prompt") {
             if (++i >= argc) {
@@ -215,7 +263,13 @@ void gpt_print_usage(int /*argc*/, char ** argv, const gpt_params & params) {
     fprintf(stderr, "  -b N, --batch_size N  batch size for prompt processing (default: %d)\n", params.n_batch);
     fprintf(stderr, "  --perplexity          compute perplexity over the prompt\n");
     fprintf(stderr, "  --keep                number of tokens to keep from the initial prompt\n");
-    
+#ifdef LLAMA_SUPPORTS_GPU_OFFLOAD
+    fprintf(stderr, "  -ngl N, --n-gpu-layers N\n");
+    fprintf(stderr, "                        number of layers to store in VRAM\n");
+    fprintf(stderr, "  -ts SPLIT --tensor-split SPLIT\n");
+    fprintf(stderr, "                        how to split tensors across multiple GPUs, comma-separated list of proportions, e.g. 3,1\n");
+    fprintf(stderr, "  -mg i, --main-gpu i   the GPU to use for scratch and small tensors\n" );
+#endif
    
     fprintf(stderr, "  --mtest               compute maximum memory usage\n");
     fprintf(stderr, "  --verbose-prompt      print prompt before generation\n");

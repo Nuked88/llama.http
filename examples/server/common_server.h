@@ -9,6 +9,7 @@
 #include <random>
 #include <thread>
 #include <unordered_map>
+#include <regex>
 //
 // CLI argument parsing
 //
@@ -21,7 +22,10 @@ struct gpt_params {
     int32_t n_ctx         = 512;  // context size
     int32_t n_batch       = 8;    // batch size for prompt processing
     int32_t n_keep        = 0;    // number of tokens to keep from initial prompt
-    int32_t n_gpu_layers  = 0;
+    int32_t n_gpu_layers  = 0; // number of layers to store in VRAM
+    int32_t main_gpu      = 0;    // the GPU that is used for scratch and small tensors
+    float   tensor_split[LLAMA_MAX_DEVICES] = {0}; // how split tensors should be distributed across GPUs
+
     // sampling parameters
     std::unordered_map<llama_token, float> logit_bias; // logit bias for specific tokens
     int32_t top_k = 40;
@@ -44,7 +48,8 @@ struct gpt_params {
     std::string input_suffix = ""; // string to suffix user inputs with
     std::string server_address = "0.0.0.0"; //server address
 
-
+    std::string lora_adapter = "";  // lora adapter path
+    std::string lora_base    = "";  // base model path for the lora adapter
 
     std::vector<std::string> antiprompt; // string upon seeing which more user input is prompted
 
@@ -63,6 +68,7 @@ struct gpt_params {
     bool mem_test          = false; // compute maximum memory usage
     bool verbose_prompt    = false; // print prompt tokens before generation
     bool server_start      = false; // start http server
+    bool use_mmap          = true;  // use mmap for faster loads
 };
 
 bool gpt_params_parse(int argc, char ** argv, gpt_params & params);
