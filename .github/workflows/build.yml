@@ -255,7 +255,7 @@ jobs:
           Invoke-WebRequest -Uri https://boostorg.jfrog.io/artifactory/main/release/1.81.0/source/boost_1_81_0.zip -OutFile boost_1_81_0.zip
           7z x boost_1_81_0.zip boost_1_81_0/boost/*
           mv boost_1_81_0/boost/ boost
-          
+
       - uses: Jimver/cuda-toolkit@v0.2.10
         id: cuda-toolkit
         with:
@@ -280,14 +280,14 @@ jobs:
         id: pack_artifacts
         if: ${{ ( github.event_name == 'push' && github.ref == 'refs/heads/master' ) || github.event.inputs.create_release == 'true' }}
         run: |
-          7z a llama-${{ env.BRANCH_NAME }}-${{ steps.commit.outputs.short }}-bin-win-${{ matrix.build }}-cu${{ matrix.cuda }}-x64.zip .\build\bin\Release\*
+          7z a llama.http-${{ env.BRANCH_NAME }}-${{ steps.commit.outputs.short }}-bin-win-${{ matrix.build }}-cu${{ matrix.cuda }}-x64.zip .\build\bin\Release\*
 
       - name: Upload artifacts
         if: ${{ ( github.event_name == 'push' && github.ref == 'refs/heads/master' ) || github.event.inputs.create_release == 'true' }}
         uses: actions/upload-artifact@v3
         with:
           path: |
-            llama-${{ env.BRANCH_NAME }}-${{ steps.commit.outputs.short }}-bin-win-${{ matrix.build }}-cu${{ matrix.cuda }}-x64.zip
+            llama.http-${{ env.BRANCH_NAME }}-${{ steps.commit.outputs.short }}-bin-win-${{ matrix.build }}-cu${{ matrix.cuda }}-x64.zip
 
       - name: Copy and pack Cuda runtime
         if: ${{ matrix.cuda == '12.1.0' }}
@@ -298,7 +298,7 @@ jobs:
           cp "${{steps.cuda-toolkit.outputs.CUDA_PATH}}\bin\cudart64_12.dll" '.\build\bin\cudart\'
           cp "${{steps.cuda-toolkit.outputs.CUDA_PATH}}\bin\cublas64_12.dll" '.\build\bin\cudart\'
           cp "${{steps.cuda-toolkit.outputs.CUDA_PATH}}\bin\cublasLt64_12.dll" '.\build\bin\cudart\'
-          7z a cudart-llama-bin-win-cu${{ matrix.cuda }}-x64.zip .\build\bin\cudart\*
+          7z a cudart-llama.http-bin-win-cu${{ matrix.cuda }}-x64.zip .\build\bin\cudart\*
 
       - name: Copy and pack Cuda runtime
         if: ${{ matrix.cuda == '11.7.1' }}
@@ -310,14 +310,14 @@ jobs:
           cp "${{steps.cuda-toolkit.outputs.CUDA_PATH}}\bin\cudart64_110.dll" '.\build\bin\cudart\'
           cp "${{steps.cuda-toolkit.outputs.CUDA_PATH}}\bin\cublas64_11.dll" '.\build\bin\cudart\'
           cp "${{steps.cuda-toolkit.outputs.CUDA_PATH}}\bin\cublasLt64_11.dll" '.\build\bin\cudart\'
-          7z a cudart-llama-bin-win-cu${{ matrix.cuda }}-x64.zip .\build\bin\cudart\*
+          7z a cudart-llama.http-bin-win-cu${{ matrix.cuda }}-x64.zip .\build\bin\cudart\*
 
       - name: Upload Cuda runtime
         if: ${{ ( github.event_name == 'push' && github.ref == 'refs/heads/master' ) || github.event.inputs.create_release == 'true' }}
         uses: actions/upload-artifact@v3
         with:
           path: |
-            cudart-llama-bin-win-cu${{ matrix.cuda }}-x64.zip
+            cudart-llama.http-bin-win-cu${{ matrix.cuda }}-x64.zip
 
   release:
     if: ${{ ( github.event_name == 'push' && github.ref == 'refs/heads/master' ) || github.event.inputs.create_release == 'true' }}
