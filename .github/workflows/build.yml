@@ -32,6 +32,10 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install build-essential gcc-8
+          sudo apt-get update
+          sudo apt-get install build-essential
+          wget https://boostorg.jfrog.io/artifactory/main/release/1.81.0/source/boost_1_81_0.tar.gz
+          tar xzf boost_1_81_0.tar.gz -C . --strip-components=1 boost_1_81_0/boost
 
       - name: Build
         id: make_build
@@ -67,6 +71,25 @@ jobs:
         run: |
           cd build
           ctest --verbose
+
+      - name: Get commit hash
+        id: commit
+        if: ${{ ( github.event_name == 'push' && github.ref == 'refs/heads/master' ) || github.event.inputs.create_release == 'true' }}
+        uses: pr-mpt/actions-commit-hash@v2
+
+      - name: Pack artifacts
+        id: pack_artifacts
+        if: ${{ ( github.event_name == 'push' && github.ref == 'refs/heads/master' ) || github.event.inputs.create_release == 'true' }}
+        run: |
+          Copy-Item LICENSE .\build\bin\Release\llama.http.txt
+          7z a llama.http-${{ env.BRANCH_NAME }}-${{ steps.commit.outputs.short }}-bin-deb-${{ matrix.build }}-x64.zip .\build\bin\Release\*
+
+      - name: Upload artifacts
+        if: ${{ ( github.event_name == 'push' && github.ref == 'refs/heads/master' ) || github.event.inputs.create_release == 'true' }}
+        uses: actions/upload-artifact@v3
+        with:
+          path: |
+            llama.http-${{ env.BRANCH_NAME }}-${{ steps.commit.outputs.short }}-bin-deb-${{ matrix.build }}-x64.zip
 
   ubuntu-latest-cmake-sanitizer:
     runs-on: ubuntu-latest
@@ -104,6 +127,26 @@ jobs:
         run: |
           cd build
           ctest --verbose
+
+      - name: Get commit hash
+        id: commit
+        if: ${{ ( github.event_name == 'push' && github.ref == 'refs/heads/master' ) || github.event.inputs.create_release == 'true' }}
+        uses: pr-mpt/actions-commit-hash@v2
+
+      - name: Pack artifacts
+        id: pack_artifacts
+        if: ${{ ( github.event_name == 'push' && github.ref == 'refs/heads/master' ) || github.event.inputs.create_release == 'true' }}
+        run: |
+          Copy-Item LICENSE .\build\bin\Release\llama.http.txt
+          7z a llama.http-${{ env.BRANCH_NAME }}-${{ steps.commit.outputs.short }}-bin-deb-${{ matrix.build }}-x64.zip .\build\bin\Release\*
+
+      - name: Upload artifacts
+        if: ${{ ( github.event_name == 'push' && github.ref == 'refs/heads/master' ) || github.event.inputs.create_release == 'true' }}
+        uses: actions/upload-artifact@v3
+        with:
+          path: |
+            llama.http-${{ env.BRANCH_NAME }}-${{ steps.commit.outputs.short }}-bin-deb-${{ matrix.build }}-x64.zip
+    
 
 
 
