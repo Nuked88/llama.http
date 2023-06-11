@@ -1,6 +1,6 @@
 #include "common_server.h"
 #include "llama.h"
-
+#include "build-info.h"
 #include <cassert>
 #include <cinttypes>
 #include <cmath>
@@ -67,6 +67,7 @@ enum console_state {
 };
 
 static console_state con_st = CONSOLE_STATE_DEFAULT;
+static llama_context ** g_ctx;
 static bool con_use_color = false;
 using tcp = boost::asio::ip::tcp; // alias IP
 
@@ -208,31 +209,33 @@ int main(int argc, char ** argv) {
                 "expect poor results\n", __func__, params.n_ctx);
     }
 
+    fprintf(stderr, "%s: build = %d (%s)\n", __func__, BUILD_NUMBER, BUILD_COMMIT);
+    
     if (params.seed <= 0) {
         params.seed = time(NULL);
     }
 
-    fprintf(stderr, "%s: seed = %d\n", __func__, params.seed);
+    fprintf(stderr, "%s: seed  = %d\n", __func__, params.seed);
 
     std::mt19937 rng(params.seed);
     if (params.random_prompt) {
         params.prompt = gpt_random_prompt(rng);
     }
 
-    //    params.prompt = R"(// this function checks if the number n is prime
+    //    params.prompt = R(// this function checks if the number n is prime
     //bool is_prime(int n) {)";
 
     llama_context * ctx;
-
+    g_ctx = &ctx;
     // load the model
     {
         auto lparams = llama_context_default_params();
 
         lparams.n_ctx      = params.n_ctx;
-        lparams.n_parts    = params.n_parts;
         lparams.seed       = params.seed;
         lparams.f16_kv     = params.memory_f16;
         lparams.use_mlock  = params.use_mlock;
+        lparams.n_gpu_layers = params.n_gpu_layers;
 
         ctx = llama_init_from_file(params.model.c_str(), lparams);
 
@@ -253,7 +256,7 @@ int main(int argc, char ** argv) {
     // uncomment the "used_mem" line in llama.cpp to see the results
     if (params.mem_test) {
         {
-            const std::vector<llama_token> tmp(params.n_batch, 0);
+            const std::vector<llama_token> tmp(params.n_batch, llama_token_bos());
             llama_eval(ctx, tmp.data(), tmp.size(), 0, params.n_threads);
         }
 
@@ -433,20 +436,76 @@ while (true) {
 
         if ((int) embd_inp.size() <= n_consumed) {
             // out of user input, sample next token
-            const float top_k          = params.top_k;
-            const float top_p          = params.top_p;
-            const float temp           = params.temp;
-            const float repeat_penalty = params.repeat_penalty;
-
+            const float   top_k           = params.top_k;
+            const float   top_p           = params.top_p;
+            const float   tfs_z           = params.tfs_z;
+            const float   temp            = params.temp;
+            const float   typical_p       = params.typical_p;
+            const int32_t repeat_last_n   = params.repeat_last_n < 0 ? n_ctx : params.repeat_last_n;
+            const float   repeat_penalty  = params.repeat_penalty;
+            const float   alpha_presence  = params.presence_penalty;
+            const float   alpha_frequency = params.frequency_penalty;
+            const int     mirostat        = params.mirostat;
+            const float   mirostat_tau    = params.mirostat_tau;
+            const float   mirostat_eta    = params.mirostat_eta;
+            const bool    penalize_nl     = params.penalize_nl;
             llama_token id = 0;
             {
                 auto logits = llama_get_logits(ctx);
-                if (params.ignore_eos) {
-                    logits[llama_token_eos()] = 0;
+                auto n_vocab = llama_n_vocab(ctx);
+
+                // Apply params.logit_bias map
+                for (auto it = params.logit_bias.begin(); it != params.logit_bias.end(); it++) {
+                    logits[it->first] += it->second;
                 }
-                id = llama_sample_top_p_top_k(ctx,
-                        last_n_tokens.data() + n_ctx - params.repeat_last_n,
-                        params.repeat_last_n, top_k, top_p, temp, repeat_penalty);
+
+                std::vector<llama_token_data> candidates;
+                candidates.reserve(n_vocab);
+                for (llama_token token_id = 0; token_id < n_vocab; token_id++) {
+                    candidates.emplace_back(llama_token_data{token_id, logits[token_id], 0.0f});
+                }
+
+                llama_token_data_array candidates_p = { candidates.data(), candidates.size(), false };
+
+                // Apply penalties
+                float nl_logit = logits[llama_token_nl()];
+                auto last_n_repeat = std::min(std::min((int)last_n_tokens.size(), repeat_last_n), n_ctx);
+                llama_sample_repetition_penalty(ctx, &candidates_p,
+                    last_n_tokens.data() + last_n_tokens.size() - last_n_repeat,
+                    last_n_repeat, repeat_penalty);
+                llama_sample_frequency_and_presence_penalties(ctx, &candidates_p,
+                    last_n_tokens.data() + last_n_tokens.size() - last_n_repeat,
+                    last_n_repeat, alpha_frequency, alpha_presence);
+                if (!penalize_nl) {
+                    logits[llama_token_nl()] = nl_logit;
+                }
+
+                if (temp <= 0) {
+                    // Greedy sampling
+                    id = llama_sample_token_greedy(ctx, &candidates_p);
+                } else {
+                    if (mirostat == 1) {
+                        static float mirostat_mu = 2.0f * mirostat_tau;
+                        const int mirostat_m = 100;
+                        llama_sample_temperature(ctx, &candidates_p, temp);
+                        id = llama_sample_token_mirostat(ctx, &candidates_p, mirostat_tau, mirostat_eta, mirostat_m, &mirostat_mu);
+                    } else if (mirostat == 2) {
+                        static float mirostat_mu = 2.0f * mirostat_tau;
+                        llama_sample_temperature(ctx, &candidates_p, temp);
+                        id = llama_sample_token_mirostat_v2(ctx, &candidates_p, mirostat_tau, mirostat_eta, &mirostat_mu);
+                    } else {
+                        // Temperature sampling
+                        llama_sample_top_k(ctx, &candidates_p, top_k, 1);
+                        llama_sample_tail_free(ctx, &candidates_p, tfs_z, 1);
+                        llama_sample_typical(ctx, &candidates_p, typical_p, 1);
+                        llama_sample_top_p(ctx, &candidates_p, top_p, 1);
+                        llama_sample_temperature(ctx, &candidates_p, temp);
+                        id = llama_sample_token(ctx, &candidates_p);
+                    }
+                }
+                // id = llama_sample_top_p_top_k(ctx,
+                //         last_n_tokens.data() + n_ctx - params.repeat_last_n,
+                //         params.repeat_last_n, top_k, top_p, temp, repeat_penalty);
                 last_n_tokens.erase(last_n_tokens.begin());
                 last_n_tokens.push_back(id);
             }
