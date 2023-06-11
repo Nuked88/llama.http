@@ -4,7 +4,9 @@ Start a fast ChatGPT-like model on your pc and interact remotely with it via HTT
 
 This is a continuation of the repository https://github.com/Nuked88/alpaca.http and is **NOT** the same as the official server of llama.cpp
 
-No performance seems to have been lost, the result is not streamed so it may look like it will take longer but it really isn't.
+~~No performance seems to have been lost, the result is not streamed so it may look like it will take longer but it really isn't~~.
+I noticed that there are some performance issues, and i need to investigate on it.
+
 
 ## Get Started
 
