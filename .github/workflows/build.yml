@@ -81,14 +81,14 @@ jobs:
         id: pack_artifacts
         if: ${{ ( github.event_name == 'push' && github.ref == 'refs/heads/master' ) || github.event.inputs.create_release == 'true' }}
         run: |
-          7z a llama.http-${{ env.BRANCH_NAME }}-${{ steps.commit.outputs.short }}-bin-deb-${{ matrix.build }}-x64.zip  ./build/*
+          7z a llama.http-${{ env.BRANCH_NAME }}-${{ steps.commit.outputs.short }}-bin-deb-latest-x64.zip  ./build/*
 
       - name: Upload artifacts
         if: ${{ ( github.event_name == 'push' && github.ref == 'refs/heads/master' ) || github.event.inputs.create_release == 'true' }}
         uses: actions/upload-artifact@v3
         with:
           path: |
-            llama.http-${{ env.BRANCH_NAME }}-${{ steps.commit.outputs.short }}-bin-deb-lastest-${{ matrix.build }}-x64.zip
+            llama.http-${{ env.BRANCH_NAME }}-${{ steps.commit.outputs.short }}-bin-deb-latest-x64.zip
 
   ubuntu-latest-cmake-sanitizer:
     runs-on: ubuntu-latest
@@ -136,14 +136,14 @@ jobs:
         id: pack_artifacts
         if: ${{ ( github.event_name == 'push' && github.ref == 'refs/heads/master' ) || github.event.inputs.create_release == 'true' }}
         run: |
-          7z a llama.http-${{ env.BRANCH_NAME }}-${{ steps.commit.outputs.short }}-bin-deb-${{ matrix.build }}-x64.zip  ./build/*
+          7z a llama.http-${{ env.BRANCH_NAME }}-${{ steps.commit.outputs.short }}-bin-deb-lastest-sanitizer-x64.zip  ./build/*
 
       - name: Upload artifacts
         if: ${{ ( github.event_name == 'push' && github.ref == 'refs/heads/master' ) || github.event.inputs.create_release == 'true' }}
         uses: actions/upload-artifact@v3
         with:
           path: |
-            llama.http-${{ env.BRANCH_NAME }}-${{ steps.commit.outputs.short }}-bin-deb-lastest-sanitizer-${{ matrix.build }}-x64.zip
+            llama.http-${{ env.BRANCH_NAME }}-${{ steps.commit.outputs.short }}-bin-deb-lastest-sanitizer-x64.zip
     
 
 
