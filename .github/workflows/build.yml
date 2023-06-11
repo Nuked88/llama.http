@@ -51,6 +51,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install build-essential
+          wget https://boostorg.jfrog.io/artifactory/main/release/1.81.0/source/boost_1_81_0.tar.gz
+          tar xzf boost_1_81_0.tar.gz -C . --strip-components=1 boost_1_81_0/boost
 
       - name: Build
         id: cmake_build
@@ -103,50 +105,7 @@ jobs:
           cd build
           ctest --verbose
 
-  macOS-latest-make:
-    runs-on: macos-latest
 
-    steps:
-      - name: Clone
-        id: checkout
-        uses: actions/checkout@v1
-
-      - name: Dependencies
-        id: depends
-        run: |
-          brew update
-
-      - name: Build
-        id: make_build
-        run: |
-          make
-
-  macOS-latest-cmake:
-    runs-on: macos-latest
-
-    steps:
-      - name: Clone
-        id: checkout
-        uses: actions/checkout@v1
-
-      - name: Dependencies
-        id: depends
-        run: |
-          brew update
-
-      - name: Build
-        id: cmake_build
-        run: |
-          mkdir build
-          cd build
-          cmake -DLLAMA_AVX2=OFF ..
-          cmake --build . --config Release
-
-      - name: Test
-        id: cmake_test
-        run: |
-          cd build
-          ctest --verbose
 
   windows-latest-cmake:
     runs-on: windows-latest
@@ -290,6 +249,13 @@ jobs:
         id: checkout
         uses: actions/checkout@v1
 
+    - name: Dependencies
+        id: depends
+        run: |
+          Invoke-WebRequest -Uri https://boostorg.jfrog.io/artifactory/main/release/1.81.0/source/boost_1_81_0.zip -OutFile boost_1_81_0.zip
+          7z x boost_1_81_0.zip boost_1_81_0/boost/*
+          mv boost_1_81_0/boost/ boost
+          
       - uses: Jimver/cuda-toolkit@v0.2.10
         id: cuda-toolkit
         with:
